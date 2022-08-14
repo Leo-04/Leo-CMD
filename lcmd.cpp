@@ -6,7 +6,7 @@
 #include <direct.h>
 #include <signal.h>
 
-#include<windows.h>
+#include <windows.h>
 #define getcwd _getcwd
 
 using namespace std;
@@ -135,9 +135,6 @@ void handle_argv(int argc, char** argv){
 		else if (prev_arg == "-cwd")
 			goto_cwd = arg;
 		
-		else if (prev_arg == "-color_prompt")
-			color_prompt = "\033[1;"+arg+"m";
-		
 		else if (prev_arg == "-color_cwd")
 			color_cwd = "\033[1;"+arg+"m";
 		
@@ -152,6 +149,9 @@ void handle_argv(int argc, char** argv){
 		
 		else if (prev_arg == "-color_prompt")
 			color_prompt = "\033[1;"+arg+"m";
+		
+		else if (arg == "-help" || arg == "-h")
+			cout<<color_normal<<"\nLCMD version 4 command arguments:\n\t-path <folder to add to PATH>\n\t-cwd <directory to start in>\n\t-color_prompt <ansi color code>\n\t-color_cwd <ansi color code>\n\t-color_normal <ansi color code>\n\t-color_info <ansi color code>\n\t-color_error <ansi color code>\n";
 		
 		prev_arg = arg;
 	}
@@ -249,10 +249,10 @@ int mainloop(){
 				command.replace(pos, 11, arg);
 			
 			//Run it
-			run_command(command, /*env,*/ cwd);
+			run_command(command, cwd);
 		} else {
 			//Run input
-			run_command(input, /*env,*/ cwd);
+			run_command(input, cwd);
 		}
 	}
 	return 0;
