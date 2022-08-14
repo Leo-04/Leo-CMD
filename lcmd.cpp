@@ -12,11 +12,14 @@
 using namespace std;
 
 // Ansi color codes
-const string color_prompt	= "\033[1;93m";
-const string color_cwd		= "\033[1;94m";
-const string color_error	= "\033[1;91m";
-const string color_info		= "\033[1;92m";
-const string color_normal	= "\033[1;97m";
+string color_prompt	= "\033[1;93m";
+string color_cwd	= "\033[1;94m";
+string color_error	= "\033[1;91m";
+string color_info	= "\033[1;92m";
+string color_normal	= "\033[1;97m";
+
+//Alias variables
+std::map<std::string, std::string> commands;
 
 // Catch user pressing Contol-c and make sure it doesn't close Lcmd
 void on_signal(int s){
@@ -28,12 +31,13 @@ void on_signal(int s){
 	signal (SIGINT, on_signal);
 }
 
+//Enables ansi escape codes to be used for colors
 void enable_color(){
-	//Enables ansi escape codes to be used for colors
 	
+	//Somtimes not defined
 	#ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
-	#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
-	#endif // ENABLE_VIRTUAL_TERMINAL_PROCESSING
+		#define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+	#endif
 	
 	HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
 	DWORD dwMode = 0;
@@ -42,35 +46,25 @@ void enable_color(){
 	dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 	SetConsoleMode(hOut, dwMode);
 }
+
+//Gets the directory of the current executeable
 string make_exe_location(){
-	//Gets the directory of the current executeable
-	
 	char path[MAX_PATH];
-	// gets full path, includeing name
+	//Gets full path
     size_t len = GetModuleFileName(NULL, path, MAX_PATH);
 	
-	// Remove name
+	//Removes filename, leaving the file path
 	path[len] = 0;
 	for (size_t i = len; i >= 0 && path[i]!='\\'; i--)
 		path[i] = 0;
 	
 	return path;
 }
-string make_env(string exe_loc){
-	//Reconstructs the path variable to include the executeable location
-	// and the "cmds" folder
-	
-	std::stringstream ss;
-	ss << "PATH=" << getenv("PATH");
-	ss << ";" << exe_loc;
-	ss << ";" << exe_loc << "cmds/";
-	ss << '\0';
-	return ss.str();
-}
 
-void run_command(string command, string env, char* cwd){
-	//Runs a command with envorments and current working directory
+//Runs a command with current working directory
+void run_command(string command, char* cwd){
 	
+	//Strutures to get prossess information
 	STARTUPINFO info={sizeof(info)};
 	PROCESS_INFORMATION processInfo;
 	
@@ -78,14 +72,18 @@ void run_command(string command, string env, char* cwd){
 	int start = std::clock();
 	int duration;
 	
-	if (CreateProcess("C:/windows/system32/cmd.exe", const_cast<char *>(("/c "+command).c_str()), NULL, NULL, FALSE, 0, const_cast<char *>(env.c_str()), cwd, &info, &processInfo)){
+	//Executes command using 'cmd /c <command>'
+	if (CreateProcess("C:/windows/system32/cmd.exe", const_cast<char *>(("/c "+command).c_str()), NULL, NULL, FALSE, 0, NULL, cwd, &info, &processInfo)){
 		while (1){
+			//Get exit code
 			DWORD f;
 			GetExitCodeProcess(processInfo.hProcess, &f);
 			
 			//Wait for it to finish
 			if (f!=STILL_ACTIVE &&(WaitForSingleObject(processInfo.hProcess, 0)!=WAIT_TIMEOUT)){
-				duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
+				duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC; // Get duration
+				
+				//Show information about execution (exit code & duration)
 				cout<<color_info<<"\nProsses Returned: "<<f<<" (0x"<<std::hex<<(f)<<") execution time: "<<std::dec<<duration<<" s"<<color_normal;
 				break;
 			}
@@ -98,40 +96,85 @@ void run_command(string command, string env, char* cwd){
 		cerr<<color_error<<"Can't Run: "<<command<<color_normal<<"\n";
 }
 
-
-int main(int argc, char** argv){
-	char cwd[MAX_PATH];
-	string input, cmd, arg, striped_arg;
-	int exit_code = 0;
-	
-	//Get variables
-	string exe_loc = make_exe_location();
-	string env = make_env(exe_loc);
-	std::map<std::string, std::string> commands;
-	
-	//Basic commands from linux
-	commands["ls"] = "dir /og /c /d /w /4 %%";
+//Inialize program
+void init(){
+	//Alias variables
+	commands["ls"] = "dir /og /c /d /w /4 %LCMD ARGS%";
 	commands["clear"] = "cls";
-	commands["whereis"] = "where %%";
-	commands["version"] = "echo LCMD on && ver";
+	commands["whereis"] = "where %LCMD ARGS%";
+	commands["version"] = "echo LCMD version 4 on && ver";
 	
-	//Hook
+	//Hook signals
 	signal (SIGINT, on_signal);
 	enable_color();
 	
+	//Set title to 'LCMD'
 	system("title LCMD");
 	
-	//Handle Argv
-	if (argc > 2){
-		cerr<<color_error<<"To many arguments for LCMD"<<color_normal<<"\n";
-	//Allow a starting directory
-	} if (argc == 2){
+	//Display header
+	cout<<color_normal<<"LCMD version 4\n\tUse 'alias <name> <command>' it create alias of commands\n\tType 'exit' or '^X' to exit\n";
+}
+
+//Handles argv instructions
+void handle_argv(int argc, char** argv){
+	string arg;
+	string goto_cwd = "";
+	string prev_arg = "";
+	
+	//Start path
+	std::stringstream ss;
+	ss << getenv("PATH");
+	ss << ";" << make_exe_location() << "\\cmds\\";
+	
+	for (int i = 0; i < argc; i++){
+		arg = argv[i];
+		
+		if (prev_arg == "-path")
+			ss << ";" << arg;
+		
+		else if (prev_arg == "-cwd")
+			goto_cwd = arg;
+		
+		else if (prev_arg == "-color_prompt")
+			color_prompt = "\033[1;"+arg+"m";
+		
+		else if (prev_arg == "-color_cwd")
+			color_cwd = "\033[1;"+arg+"m";
+		
+		else if (prev_arg == "-color_error")
+			color_error = "\033[1;"+arg+"m";
+		
+		else if (prev_arg == "-color_info")
+			color_info = "\033[1;"+arg+"m";
+		
+		else if (prev_arg == "-color_normal")
+			color_normal = "\033[1;"+arg+"m";
+		
+		else if (prev_arg == "-color_prompt")
+			color_prompt = "\033[1;"+arg+"m";
+		
+		prev_arg = arg;
+	}
+	
+	if (goto_cwd != ""){
 		// Change Current Working Directory
-		if (SetCurrentDirectory(argv[1]) == 0){
-			cerr<<color_error<<"Cant Change current directory to '"<<argv[1]<<"'"<<color_normal<<"\n";
-			return -1;
+		if (SetCurrentDirectory(goto_cwd.c_str()) == 0){
+			cerr<<color_error<<"Cant Change current directory to '"<<goto_cwd<<"'"<<color_normal<<"\n";
 		}
 	}
+	
+	//End path & add it to env
+	ss << '\0';
+	std::string env = ss.str();
+	//setenv("PATH", env.c_str(), 1);
+	//_putenv(("PATH="+env).c_str());
+	SetEnvironmentVariable("PATH", env.c_str());
+}
+
+//Main loop
+int mainloop(){
+	char cwd[MAX_PATH];
+	string input, cmd, arg, striped_arg;
 	
 	while (true){
 		if (!getcwd(cwd, sizeof(cwd)))
@@ -146,7 +189,7 @@ int main(int argc, char** argv){
 			continue;
 		
 		//Split command and arguments
-		if (input.find(" ") == -1){
+		if (input.find(" ") == (unsigned int) -1){
 			cmd = input;
 			arg = "";
 			striped_arg = "";
@@ -170,10 +213,10 @@ int main(int argc, char** argv){
 			}
 		}
 		
-		if (cmd == "exit"){
+		if (cmd == "exit" || cmd[0] == 24){
 			//Exit the app
 			try{
-				exit_code = stoi(striped_arg);
+				return stoi(striped_arg);
 			} catch (...){}
 			break;
 		} else if (cmd == "cd"){
@@ -186,24 +229,38 @@ int main(int argc, char** argv){
 			
 			cmd = arg.substr(0, arg.find(" "));
 			arg = arg.substr(arg.find(" ")+1, arg.size());
-			
-			commands[cmd] = arg;
+			if (arg == ""){
+				cout<<color_normal<<"Used to create alias of commands\n\t%LCMD ARGS% is replaced by the arguments passed to the alias\n\nCurrent aliases:\n";
+				
+				for (map<string, string>::iterator it = commands.begin(); it != commands.end(); it++)
+				{
+					cout << "\t" << color_prompt << it->first << color_normal << ": " << color_info << it->second << color_normal << "\n";
+				}
+			}
+			else
+				commands[cmd] = arg;
 		} else if (commands.find(cmd) != commands.end()){
 			//Find alias
 			string command = commands[cmd];
 			
 			//Replace arguments
-			int pos = command.find("%%");
+			int pos = command.find("%LCMD ARGS%");
 			if (pos != -1)
-				command.replace(pos, 2, arg);
+				command.replace(pos, 11, arg);
 			
 			//Run it
-			run_command(command, env, cwd);
+			run_command(command, /*env,*/ cwd);
 		} else {
 			//Run input
-			run_command(input, env, cwd);
+			run_command(input, /*env,*/ cwd);
 		}
 	}
+	return 0;
+}
+
+int main(int argc, char** argv){
+	init();
+	handle_argv(argc, argv);
 	
-	return exit_code;
+	return mainloop();
 }
