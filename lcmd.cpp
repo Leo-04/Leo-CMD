@@ -21,6 +21,9 @@ string color_normal	= "\033[1;97m";
 //Alias variables
 std::map<std::string, std::string> commands;
 
+//Control key to exit
+char exit_key = 'Z';
+
 // Catch user pressing Contol-c and make sure it doesn't close Lcmd
 void on_signal(int s){
 	if (s==2)
@@ -110,9 +113,6 @@ void init(){
 	
 	//Set title to 'LCMD'
 	system("title LCMD");
-	
-	//Display header
-	cout<<color_normal<<"LCMD version 4\n\tUse 'alias <name> <command>' it create alias of commands\n\tType 'exit' or '^X' to exit\n";
 }
 
 //Handles argv instructions
@@ -120,11 +120,13 @@ void handle_argv(int argc, char** argv){
 	string arg;
 	string goto_cwd = "";
 	string prev_arg = "";
+	string exe_location =  make_exe_location();
 	
 	//Start path
 	std::stringstream ss;
 	ss << getenv("PATH");
-	ss << ";" << make_exe_location() << "\\cmds\\";
+	ss << ";" << exe_location;
+	ss << ";" << exe_location << "\\cmds\\";
 	
 	for (int i = 0; i < argc; i++){
 		arg = argv[i];
@@ -151,7 +153,7 @@ void handle_argv(int argc, char** argv){
 			color_prompt = "\033[1;"+arg+"m";
 		
 		else if (arg == "-help" || arg == "-h")
-			cout<<color_normal<<"\nLCMD version 4 command arguments:\n\t-path <folder to add to PATH>\n\t-cwd <directory to start in>\n\t-noansicolor\n\t-color <2 hex digits, forst for background, then foreground>\n\t-color_prompt <ansi color code>\n\t-color_cwd <ansi color code>\n\t-color_normal <ansi color code>\n\t-color_info <ansi color code>\n\t-color_error <ansi color code>\n";
+			cout<<color_normal<<"\nCommand arguments:\n\t-path <folder to add to PATH>\n\t-cwd <directory to start in>\n\t-noansicolor\n\t-color <2 hex digits, first for background, then foreground>\n\t-exitkey <Key A-Z>\n\t-color_prompt <ansi color code>\n\t-color_cwd <ansi color code>\n\t-color_normal <ansi color code>\n\t-color_info <ansi color code>\n\t-color_error <ansi color code>\n";
 		
 		else if (arg == "-noansicolor"){
 			color_prompt = "";
@@ -163,6 +165,11 @@ void handle_argv(int argc, char** argv){
 		else if (prev_arg == "-color"){
 			if (arg.size() == 2 && (isxdigit(arg[0])) && (isxdigit(arg[1]))){
 				system(("color "+arg).c_str());
+			}
+		}
+		else if (prev_arg == "-exitkey"){
+			if (arg.size() == 1){
+				exit_key = toupper(arg[0]);
 			}
 		}
 		
@@ -196,6 +203,16 @@ int mainloop(){
 		//Ask for command
 		cout<<"\n"<<color_cwd<<cwd<<">>:"<<color_prompt;
 		getline (cin, input);
+		if (cin.eof()){
+			//Special case for ^Z as it cause EOF
+			cin.clear();
+			if (exit_key == 'Z'){
+				return 0;
+			}
+		} else if (cin.fail()){
+			cin.clear();
+		}
+		
 		cout << color_normal;
 		
 		if (input == "")
@@ -226,7 +243,7 @@ int mainloop(){
 			}
 		}
 		
-		if (cmd == "exit" || cmd[0] == 24){
+		if (cmd == "exit" || cmd[0] == (exit_key - '@')){
 			//Exit the app
 			try{
 				return stoi(striped_arg);
@@ -275,5 +292,14 @@ int main(int argc, char** argv){
 	init();
 	handle_argv(argc, argv);
 	
-	return mainloop();
+	//Display header
+	cout<<color_normal<<"LCMD version 4\n\tUse 'alias <name> <command>' it create alias of commands\n\tType 'exit' or '^"<< exit_key <<"' to exit\n";
+	
+	//Mainloop
+	int ret = mainloop();
+	
+	//Reset colors
+	cout<<color_normal;
+	
+	return ret;
 }
