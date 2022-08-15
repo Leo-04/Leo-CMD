@@ -151,7 +151,20 @@ void handle_argv(int argc, char** argv){
 			color_prompt = "\033[1;"+arg+"m";
 		
 		else if (arg == "-help" || arg == "-h")
-			cout<<color_normal<<"\nLCMD version 4 command arguments:\n\t-path <folder to add to PATH>\n\t-cwd <directory to start in>\n\t-color_prompt <ansi color code>\n\t-color_cwd <ansi color code>\n\t-color_normal <ansi color code>\n\t-color_info <ansi color code>\n\t-color_error <ansi color code>\n";
+			cout<<color_normal<<"\nLCMD version 4 command arguments:\n\t-path <folder to add to PATH>\n\t-cwd <directory to start in>\n\t-noansicolor\n\t-color <2 hex digits, forst for background, then foreground>\n\t-color_prompt <ansi color code>\n\t-color_cwd <ansi color code>\n\t-color_normal <ansi color code>\n\t-color_info <ansi color code>\n\t-color_error <ansi color code>\n";
+		
+		else if (arg == "-noansicolor"){
+			color_prompt = "";
+			color_cwd	= "";
+			color_error	= "";
+			color_info	= "";
+			color_normal = "";
+		}
+		else if (prev_arg == "-color"){
+			if (arg.size() == 2 && (isxdigit(arg[0])) && (isxdigit(arg[1]))){
+				system(("color "+arg).c_str());
+			}
+		}
 		
 		prev_arg = arg;
 	}
