@@ -24,11 +24,13 @@ std::map<std::string, std::string> commands;
 //Control key to exit
 char exit_key = 'Z';
 
+
 // Catch user pressing Contol-c and make sure it doesn't close Lcmd
+bool ctrl_c_pressed = false;
 void on_signal(int s){
-	if (s==2)
-		//Reset input
-		cin.clear();
+	
+	ctrl_c_pressed = true;
+	cin.clear();
 	
 	// Reasign hook
 	signal (SIGINT, on_signal);
@@ -202,15 +204,19 @@ int mainloop(){
 		
 		//Ask for command
 		cout<<"\n"<<color_cwd<<cwd<<">>:"<<color_prompt;
+		ctrl_c_pressed = false;
 		getline (cin, input);
-		if (cin.eof()){
-			//Special case for ^Z as it cause EOF
+		
+		//Special case for ^Z as it cause EOF
+		if (cin.fail() || cin.eof()){
+			Sleep(100); // Give time for sigint
+			
 			cin.clear();
-			if (exit_key == 'Z'){
-				return 0;
+			
+			if (exit_key == 'Z' && !ctrl_c_pressed){
+				
+				return 0xDECADE;
 			}
-		} else if (cin.fail()){
-			cin.clear();
 		}
 		
 		cout << color_normal;
